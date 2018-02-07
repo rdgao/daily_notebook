@@ -6,9 +6,9 @@ cd '/Users/rgao/Documents/Data/Muotri/Pri_Corticoids/SPACE/LFP/good_lfp_FC/'
 load '/Users/rgao/Documents/Data/Muotri/Pri_Corticoids/SPACE/LFP/good_lfp_FC/nwaydecomp_set10comp.mat';
 load trial_indices
 %%
-cd '/Users/rgao/Documents/Data/Muotri/Pri_Corticoids/SPACE/LFP/good_lfp_FC/'
+%cd '/Users/rgao/Documents/Data/Muotri/Pri_Corticoids/SPACE/LFP/good_lfp_FC/'
 n_comps = length(nwaycomp.comp);
-tr_per_rec = 24;% 16;
+tr_per_rec = 24; %24;% 16;
 n_trials = length(nwaycomp.comp{1}{3});
 if exist('select_chans.mat')
     load select_chans.mat
@@ -53,7 +53,7 @@ plot(tr_label, tr_profs, '.-')
 legend(num2str((1:n_comps)'))
 xlabel('Recording Number')
 ylabel('Component Weight (Normed)')
-xlim([1 43])
+xlim(tr_label([1 end]))
 
 subplot(2,2,2)
 imagesc(tr_label, 1:n_comps, tr_profs')
@@ -72,7 +72,7 @@ end
 %% visualizing single components
 %close all
 dish_dim = [8 8];
-comp = 10;
+comp = 2;
 %max_chan = 9;
 [max_amp max_chan] = max(nwaycomp.comp{comp}{1});
 
@@ -114,24 +114,50 @@ title('Time Profile')
 %plot_mea_grid([],[],nwaycomp.comp{comp}{1}, nwaycomp.comp{comp}{4}-nwaycomp.comp{comp}{4}(max_chan), [], amp_sorted(1:20))
 %%
 % plot profiles of all components
+thresh_by_amp = 1; % 1 = dont plot channels that dont meet threshold
+amp_thresh = 0.25; % threshold as a proportion of strongest channel
 grid_setting = [2,5];
 for comp=1:n_comps
+    if thresh_by_amp
+        mask = nan(prod(dish_dim),1);
+        [maskv, maskind] = sort(nwaycomp.comp{comp}{1},'descend');
+        mask(maskind(maskv>maskv(1)*amp_thresh))=1;
+    else
+        mask = ones(prod(dish_dim),1);
+    end
+    
     figure(1)
     subplot(grid_setting(1),grid_setting(2),comp)
-    imagesc(reshape(nwaycomp.comp{comp}{1}, dish_dim)')
+    %pcolor(reshape(nwaycomp.comp{comp}{1}.*mask, dish_dim)')    
+    imagesc(reshape(nwaycomp.comp{comp}{1}.*mask, dish_dim)')
+    %C = colormap;
+    %colormap([[0 0 0]; C])
+    axis square
     axis off
+    
     figure(2)
     subplot(grid_setting(1),grid_setting(2),comp)
     plot(nwaycomp.freq, nwaycomp.comp{comp}{2})
+    YL = ylim;
+    ylim([0 YL(2)])
+    
     figure(3)
     subplot(grid_setting(1),grid_setting(2),comp)
+    plot(tr_label, tr_profs(:,comp), '.k')
+    xlim(tr_label([1 end]))
+
+    figure(4)
+    subplot(grid_setting(1),grid_setting(2),comp)
     [temp max_freq] = max(nwaycomp.comp{comp}{2}); % get max freq
-    imagesc(reshape(nwaycomp.comp{comp}{4}-nwaycomp.comp{comp}{4}(max_chan), dish_dim)') %spacetime
+    imagesc(1000*reshape((nwaycomp.comp{comp}{4}-nwaycomp.comp{comp}{4}(max_chan)).*mask, dish_dim)') %spacetime
+    axis square
     axis off
+    %C = colormap;
+    %colormap([[0 0 0]; C])
     colorbar
 end
-temp = [1 2 4];
-for f=1:3
+temp = [1 2 3 4];
+for f=1:4
     figure(f)
     subplot(grid_setting(1),grid_setting(2),1)
     title(comp_names{temp(f)})
@@ -153,7 +179,7 @@ load([F(date).name '/LFP_Sp.mat']);
 %% plot trialed data for strongest channel at that comp
 well=5;
 chan = max_chan; %max_chan;
-chan = 19;
+%chan = 19;
 
 lp_freq = 20;
 B = fir1(11./lp_freq*fs_ds, lp_freq/(fs_ds/2));
@@ -171,12 +197,12 @@ end
 plot_tight(tr_data, [4,tr_per_rec/4], (1:size(tr_data,1))/1000, [min(min(tr_data)) max(max(tr_data))])
 
 %% plot a trial filtered
-tr = 4;
-top_N = 10;
+tr = 15;
+top_N = 5;
 [~, amp_sorted] = sort(nwaycomp.comp{comp}{1},'descend');
 figure
 plot((1:size(tr_data,1))/fs_ds, filter(B,1,LFP{well}(tr_all{date}(tr,1):tr_all{date}(tr,2), amp_sorted(1:top_N))));
-
+legend(num2str(amp_sorted(1:top_N)))
 
 
 %% components look like garbage because some recordings are broken.
