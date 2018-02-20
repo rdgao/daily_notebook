@@ -1,5 +1,5 @@
 % screwing around with premature infant EEG features
-cd /Users/rgao/Documents/Data/Muotri/InfantEEGFeatures
+cd /Users/rdgao/Documents/Data/Muotri/InfantEEGFeatures
 load preterm_features.mat
 %% plot each baby differently
 feat_num = 13;
@@ -16,7 +16,7 @@ ylabel(feature_cols(feat_num))
 %% aggregate plot
 %feat_num = 7;
 %plot_feat = 3600./double(features_fullepoch(:,feat_num));
-feat_num = 15;
+feat_num = 13;
 plot_feat = double(features_fullepoch(:,feat_num));
 %figure
 plot(age(:,2),plot_feat,'k.', 'markersize', 10)
