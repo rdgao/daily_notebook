@@ -1,11 +1,12 @@
 %%
-cd /Users/rdgao/Documents/Data/Lipton/batch2
+%cd /Users/rdgao/Documents/Data/Lipton/batch3/
 F = dir('*.xlsx');
 
 % Import the data and save as mat
 for i=1:length(F)
     disp(F(i).name)
-    [~, ~, raw] = xlsread(F(i).name,'Sheet1');
+    %[~, ~, raw] = xlsread(F(i).name,'Sheet1');
+    [~, ~, raw] = xlsread(F(i).name,'Parfocality'); %batch3 55Hz
     raw = raw(2:end,:);
     raw(cellfun(@(x) ~isempty(x) && isnumeric(x) && isnan(x),raw)) = {''};
     stringVectors = string(raw(:,2));
@@ -34,7 +35,7 @@ for i=1:length(F)
         inds = find(ROI==cells(cell));
         data(:,cell) = AverageIntensity(inds);
     end
-    t = (ImagePlane(inds)-1)*0.03;    
+    t = (ImagePlane(inds)-1)*(1/55);    
     save([F(i).name(1:end-5) '.mat'], 't','data')    
     clear data cells inds t ROI ImagePlane AverageIntensity
 end
@@ -326,4 +327,154 @@ title({'Mean Low Frequency (0.2-1Hz) Power','Change after NitroSynapsin'})
 nice_figure(gcf, 'comp_lowfreq', [4,4])
 [h,p]=ttest2(low_freq_pr(ad==0), low_freq_pr(ad==1))
 
-%% 
+%% batch 3 (May 26)
+cd('/Users/rdgao/Documents/data/Lipton/batch3/Calcium imaging_50 Hz')
+% 50Hz exps
+F = dir('*.mat');
+labels = {'TL Het','TL WT'};
+close all
+% do the FT
+for i=1:length(F)
+    load(F(i).name)
+    if contains(F(i).name,'WT')
+        ad_ind(i)=0;
+        C = 'k';
+    else
+        ad_ind(i)=1;
+        C='r';
+    end
+    data_dtd = detrend(data,'constant');
+    fs = 50;
+    winlen = fs*6*3;
+    noverlap = fs*4*3;
+    thresh_freq = 0.8;
+    [P, f_axis] = pwelch(data_dtd,winlen,noverlap,winlen,fs);
+    [fitparams{i}, fiterr{i}] = robfitPSD(P, f_axis(2:find(f_axis>=thresh_freq,1)), f_axis(2));
+        
+    figure(1)    
+    subplot(2,7,i)
+    plot(t, data_dtd)
+    title(F(i).name(1:end-4))
+    xlim([0, t(end)])
+    
+    figure(2)
+    subplot(2,7,i)
+    loglog(f_axis,P)
+    hold on
+    loglog(f_axis,median(P,2), 'k', 'linewidth',2)
+    hold off
+    xlim([0 15])
+    title(F(i).name(1:end-4))
+    
+    figure(3)
+    subplot(1,3,1)
+    hold on    
+    plot(i, fitparams{i}(:,1), '.', 'color', C)
+    plot(i,mean(fitparams{i}(:,1)), 'ok', 'markerfacecolor', C)
+    errorbar(i,mean(fitparams{i}(:,1)), std(fitparams{i}(:,1)), 'color', C)
+    hold off
+    %xlim([0 5])
+    title('Offset')
+    subplot(1,3,2)
+    hold on    
+    plot(i, fitparams{i}(:,2), '.', 'color', C)
+    plot(i,mean(fitparams{i}(:,2)), 'ok', 'markerfacecolor', C)
+    errorbar(i,mean(fitparams{i}(:,2)), std(fitparams{i}(:,2)), 'color',C)
+    hold off
+    %xlim([0 5])
+    title('Slope')
+    subplot(1,3,3)
+    hold on    
+    plot(i, fiterr{i}, '.', 'color', C)
+    plot(i,mean(fiterr{i}), 'ok', 'markerfacecolor', C)
+    errorbar(i,mean(fiterr{i}), std(fiterr{i}), 'color', C)
+    hold off
+    %xlim([0 5])
+    title('Fit Error')
+end
+figure(1)
+xlabel('Time(s)')
+ylabel('Intensity')
+
+figure(2)
+xlabel('Frequency (Hz)')
+ylabel('Power')
+
+figure(3)
+%% 55Hz exps
+cd('/Users/rdgao/Documents/data/Lipton/batch3/Calcium imaging_55 Hz')
+F = dir('*.mat');
+labels = {'TL Het','TL WT'};
+close all
+% do the FT
+for i=1:length(F)
+    load(F(i).name)
+    if contains(F(i).name,'WT')
+        ad_ind(i)=0;
+        C = 'k';
+    else
+        ad_ind(i)=1;
+        C='r';
+    end
+    data_dtd = detrend(data,'constant');
+    fs = 55;
+%     winlen = fs*6*2;
+%     noverlap = fs*4*2;
+    [P, f_axis] = pwelch(data_dtd,winlen,noverlap,winlen,fs);
+    [fitparams{i}, fiterr{i}] = robfitPSD(P, f_axis(2:find(f_axis>=thresh_freq,1)), f_axis(2));
+        
+    figure(1)    
+    subplot(2,6,i)
+    plot(t, data_dtd)
+    xlim([0,t(end)])
+    title(F(i).name(1:end-4))
+    
+    figure(2)
+    subplot(2,6,i)
+    loglog(f_axis,P)
+    hold on
+    loglog(f_axis,median(P,2), 'k', 'linewidth',2)
+    hold off
+    xlim([0 15])
+    title(F(i).name(1:end-4))
+    
+    figure(3)
+    subplot(1,3,1)
+    hold on    
+    plot(i, fitparams{i}(:,1), '.', 'color', C)
+    plot(i,mean(fitparams{i}(:,1)), 'ok', 'markerfacecolor', C)
+    errorbar(i,mean(fitparams{i}(:,1)), std(fitparams{i}(:,1)), 'color', C)
+    hold off
+    %xlim([0 5])
+    title('Offset')
+    subplot(1,3,2)
+    hold on    
+    plot(i, fitparams{i}(:,2), '.', 'color', C)
+    plot(i,mean(fitparams{i}(:,2)), 'ok', 'markerfacecolor', C)
+    errorbar(i,mean(fitparams{i}(:,2)), std(fitparams{i}(:,2)), 'color',C)
+    hold off
+    %xlim([0 5])
+    title('Slope')
+    subplot(1,3,3)
+    hold on    
+    plot(i, fiterr{i}, '.', 'color', C)
+    plot(i,mean(fiterr{i}), 'ok', 'markerfacecolor', C)
+    errorbar(i,mean(fiterr{i}), std(fiterr{i}), 'color', C)
+    hold off
+    %xlim([0 5])
+    title('Fit Error')
+end
+figure(1)
+xlabel('Time(s)')
+ylabel('Intensity')
+
+figure(2)
+xlabel('Frequency (Hz)')
+ylabel('Power')
+
+figure(3)
+% for i=1:3
+%     subplot(1,3,i)
+%     xticks(1:4)
+%     xticklabels(labels)
+% end
