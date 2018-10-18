@@ -44,17 +44,27 @@ end
 cd /Users/rdgao/Documents/data/Lipton/batch1
 F = dir('*.mat');
 labels = {'PS1 Het','PS1 WT','TL Het','TL WT'};
+ad_ind = zeros(length(F),1);
+fitparams={};
+fitparams_avg = zeros(length(F),2);
 close all
 % do the FT
 for i=1:length(F)
     load(F(i).name)
+    if contains(F(i).name,'WT')
+        ad_ind(i)=0;      
+    else
+        ad_ind(i)=1;       
+    end
     data_dtd = detrend(data,'constant');
     fs = 10000/(5*60);
-    winlen = fs*6*10;
-    noverlap = fs*6*8;
+    winlen = ceil(fs*10);
+    noverlap = ceil(fs*8);
+    thresh_freq = 0.8;
     [P, f_axis] = pwelch(data_dtd,winlen,noverlap,winlen,fs);
-    [fitparams{i}, fiterr{i}] = robfitPSD(P, f_axis(7:61), f_axis(2));
-        
+    [fitparams{i}, fiterr{i}] = robfitPSD(P, f_axis(2:find(f_axis>=thresh_freq,1)), f_axis(2));
+    fitparams_avg(i,:) = mean(fitparams{i},1);   
+    
     figure(1)    
     subplot(2,2,i)
     plot(t, data_dtd)
@@ -120,8 +130,8 @@ win2 = [1 3001; 3001 5001; 8001 10001];
 win3 = [2001 5001; 5001 7001; 8001 10001];
 
 fs = 10000/(5*60);
-winlen = fs*6*1.2;
-noverlap = fs*6;
+winlen = ceil(fs*10);
+noverlap = ceil(fs*8);
 fit_range = [2, 10];
 labels = {'Pre', 'Drug', 'Wash'};
 param_labels={'Offset', 'Slope', 'Fit Error'};
@@ -332,6 +342,9 @@ cd('/Users/rdgao/Documents/data/Lipton/batch3/Calcium imaging_50 Hz')
 % 50Hz exps
 F = dir('*.mat');
 labels = {'TL Het','TL WT'};
+ad_ind = zeros(length(F),1);
+fitparams={};
+fitparams_avg = zeros(length(F),2);
 close all
 % do the FT
 for i=1:length(F)
@@ -345,12 +358,12 @@ for i=1:length(F)
     end
     data_dtd = detrend(data,'constant');
     fs = 50;
-    winlen = fs*6*3;
-    noverlap = fs*4*3;
+    winlen = fs*10;
+    noverlap = fs*8;
     thresh_freq = 0.8;
     [P, f_axis] = pwelch(data_dtd,winlen,noverlap,winlen,fs);
     [fitparams{i}, fiterr{i}] = robfitPSD(P, f_axis(2:find(f_axis>=thresh_freq,1)), f_axis(2));
-        
+    fitparams_avg(i,:) = mean(fitparams{i},1);
     figure(1)    
     subplot(2,7,i)
     plot(t, data_dtd)
@@ -401,10 +414,15 @@ xlabel('Frequency (Hz)')
 ylabel('Power')
 
 figure(3)
+
+
 %% 55Hz exps
 cd('/Users/rdgao/Documents/data/Lipton/batch3/Calcium imaging_55 Hz')
 F = dir('*.mat');
 labels = {'TL Het','TL WT'};
+ad_ind = zeros(length(F),1);
+fitparams={};
+fitparams_avg = zeros(length(F),2);
 close all
 % do the FT
 for i=1:length(F)
@@ -422,7 +440,7 @@ for i=1:length(F)
 %     noverlap = fs*4*2;
     [P, f_axis] = pwelch(data_dtd,winlen,noverlap,winlen,fs);
     [fitparams{i}, fiterr{i}] = robfitPSD(P, f_axis(2:find(f_axis>=thresh_freq,1)), f_axis(2));
-        
+    fitparams_avg(i,:) = mean(fitparams{i},1);
     figure(1)    
     subplot(2,6,i)
     plot(t, data_dtd)
@@ -478,3 +496,135 @@ figure(3)
 %     xticks(1:4)
 %     xticklabels(labels)
 % end
+
+%% run batch
+% first collect TS data and conditions
+folders = {'/Users/rdgao/Documents/data/Lipton/batch1',
+    '/Users/rdgao/Documents/data/Lipton/batch2',
+    '/Users/rdgao/Documents/data/Lipton/batch3/Calcium imaging_50 Hz',
+    '/Users/rdgao/Documents/data/Lipton/batch3/Calcium imaging_55 Hz'};
+fss = [100/3, 100/3, 50, 55];
+win1 = [1001 4001; 4001 6001; 8001 10001];
+win2 = [1 3001; 3001 5001; 8001 10001];
+win3 = [2001 5001; 5001 7001; 8001 10001];
+data_stacked = {};
+cond_stacked = [];
+batch_stacked = [];
+fs_stacked = [];
+
+for ff = 1:length(folders)
+    cd(folders{ff}) 
+    disp(folders{ff})
+    F = dir('*.mat');    
+    ad_ind = zeros(length(F),1);
+    for i=1:length(F)
+        load(F(i).name)
+        disp(F(i).name)
+        if contains(F(i).name,'WT')
+            ad_ind=0;            
+        else
+            ad_ind=1;            
+        end        
+        if ff==2
+            % special condition for batch 2 pharm data
+            if contains(F(i).name,'3000')
+                drug_win = win2;
+            elseif contains(F(i).name,'5000')
+                drug_win = win3;
+            else
+                drug_win = win1;
+            end
+            inds_pre = drug_win(1,1):(drug_win(1,2)-1);
+            inds_drug = drug_win(2,1):(drug_win(2,2)-1);
+            data_stacked = [data_stacked data(inds_pre,:) data(inds_drug,:)];
+            batch_stacked = [batch_stacked ff ff];
+            fs_stacked = [fs_stacked fss(ff) fss(ff)];
+            cond_stacked = [cond_stacked ad_ind ad_ind+2]; % +2 for drug app
+        else
+            data_stacked = [data_stacked data];
+            batch_stacked = [batch_stacked ff];
+            fs_stacked = [fs_stacked fss(ff)];
+            cond_stacked = [cond_stacked ad_ind];
+        end                
+    end
+end
+cd ../..
+%% processing
+f_axis = cell(1,length(data_stacked));
+PSD = cell(1,length(data_stacked));
+Pfit = cell(1,length(data_stacked));
+fitparams = cell(length(data_stacked),2);
+fit_range = [5, 15];
+low_freq_fit = 0.9;
+
+for d = 1:length(data_stacked)
+    % compute fourier window params
+    fs = fs_stacked(d);
+    winlen = ceil(fs*10);
+    noverlap = ceil(fs*8);
+    
+    % detrend & compute welch
+    data_dtd = detrend(data_stacked{d},'linear');       
+    [PSD{d}, f_axis{d}] = pwelch(data_dtd,winlen,noverlap,winlen,fs);
+    
+    % fit low frequency for slope
+    f_fit = f_axis{d}(f_axis{d}>0 & f_axis{d}<=low_freq_fit);
+    [fitparams{d,1}, ~] = robfitPSD(PSD{d}, f_fit, f_axis{d}(2));
+    
+    % fit high frequency to normalize PSD
+    f_fit = f_axis{d}(f_axis{d}>=fit_range(1) & f_axis{d}<=fit_range(2));
+    [fitparams{d,2}, ~] = robfitPSD(PSD{d}, f_fit, f_axis{d}(2));    
+    Pfit{d} = ((10.^repmat(fitparams{d,2}(:,1),1,length(f_axis{d}))).*(f_axis{d}'.^fitparams{d,2}(:,2)))';
+    disp(d)
+    loglog(f_axis{d}, PSD{d}./Pfit{d})        
+end
+%% compute features and statistics
+for d = 1:length(data_stacked)
+    sum_range = f_axis{d}>=0.2 & f_axis{d}<=1;
+    feat_low_freq_power_norm(d) = mean(sum(log10(PSD{d}(sum_range,:)./Pfit{d}(sum_range,:)),1));
+    feat_low_freq_power(d) = mean(sum(log10(PSD{d}(sum_range,:)),1));
+    feat_slope(d) = mean(fitparams{d,1}(:,2));
+end
+
+%% comparisons
+% WT vs. AD changes after NT application
+comp_inds = batch_stacked==2; % comparison subselection criteria
+comp_exps = find(comp_inds);
+cond_comp = cond_stacked(comp_inds);
+x = [];
+y= [];
+f_ = f_axis{find(comp_inds,1)};
+sum_range = f_>=0.2 & f_<=1;
+for d = comp_exps(1:2:end)    
+    disp(d)
+    x = [x cond_stacked(d)];        
+    P_ratio = PSD{d+1}./PSD{d};
+    y = [y mean(sum(log10(P_ratio(sum_range,:)),1))];
+end
+figure
+boxplot(y,x)
+hold on
+plot(x+1,y,'ok')
+hold off
+[h,p] = ttest2(y(x==0),y(x==1))
+title(p)
+xticklabels({'WT', 'Het'})
+ylabel({'Log Power Difference (0.2-1Hz)' 'after NT Treatment (post-pre)'})
+nice_figure(gcf, ['NT_treatment'],[4 4])
+%% 
+% WT vs. AD unperturbed
+comp_inds = cond_stacked==0 | cond_stacked==1;
+cond_comp = cond_stacked(comp_inds);
+feature_comp = feat_low_freq_power_norm(comp_inds);
+x = cond_stacked(comp_inds);
+y = feature_comp;
+figure
+boxplot(y,x)
+hold on
+plot(x+1,y,'ok')
+hold off
+[h,p] = ttest2(y(x==0),y(x==1))
+title(p)
+xticklabels({'WT', 'Het'})
+ylabel('Log Power (0.2-1Hz)')
+nice_figure(gcf, ['WTAD'],[4 4])
